@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, Alert, StyleSheet, Platform, FlatList } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DatePicker from 'react-datepicker';
-import { ref, set, get, onValue } from "firebase/database";
-import { db } from "../../firebaseConfig"; // Provide the correct path to the firebaseConfig.js file
+import { ref, set, get } from "firebase/database";
+import { db } from '../../firebaseConfig';
+import Header from '../components/Header';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const BookingScreen = () => {
   const [name, setName] = useState('');
@@ -13,15 +16,43 @@ const BookingScreen = () => {
   const [showPicker, setShowPicker] = useState(false);
   const [bookings, setBookings] = useState<any[]>([]);
 
-  // Functie om boekingen op te slaan
+  const validateEmail = (email: string) => {
+    const re = /\S+@\S+\.\S+/;
+    return re.test(email);
+  };
+
   const handleBooking = () => {
     if (!name || !email || !date) {
-      Alert.alert('Error', 'Vul alle verplichte velden in.');
+      if (Platform.OS === 'web') {
+        toast.error('Alle verplichte velden moeten worden ingevuld.');
+      } else {
+        Alert.alert('Error', 'Alle verplichte velden moeten worden ingevuld.');
+      }
       return;
     }
 
-    const bookingId = Date.now().toString(); // Gebruik een unieke ID op basis van de huidige tijd
+    if (!validateEmail(email)) {
+      if (Platform.OS === 'web') {
+        toast.error('Voer een geldig e-mailadres in.');
+      } else {
+        Alert.alert('Error', 'Voer een geldig e-mailadres in.');
+      }
+      return;
+    }
 
+    const bookingDate = date.toISOString().split('T')[0];
+
+    const existingBooking = bookings.find(booking => booking.date.startsWith(bookingDate));
+    if (existingBooking) {
+      if (Platform.OS === 'web') {
+        toast.error('Er is al een boeking op deze datum.');
+      } else {
+        Alert.alert('Error', 'Er is al een boeking op deze datum.');
+      }
+      return;
+    }
+
+    const bookingId = Date.now().toString();
     const bookingData = {
       name,
       email,
@@ -29,22 +60,28 @@ const BookingScreen = () => {
       date: date.toISOString(),
     };
 
-    // Opslaan in Firebase Realtime Database
     set(ref(db, 'bookings/' + bookingId), bookingData)
       .then(() => {
-        Alert.alert('Succes', 'Uw afspraak is succesvol geboekt!');
+        if (Platform.OS === 'web') {
+          toast.success('Uw afspraak is succesvol geboekt!');
+        } else {
+          Alert.alert('Succes', 'Uw afspraak is succesvol geboekt!');
+        }
         setName('');
         setEmail('');
         setInfo('');
         setDate(null);
-        fetchBookings(); // Herlaad de boekingen na het opslaan
+        fetchBookings();
       })
       .catch((error) => {
-        Alert.alert('Error', 'Er is een fout opgetreden: ' + error.message);
+        if (Platform.OS === 'web') {
+          toast.error('Er is een fout opgetreden: ' + error.message);
+        } else {
+          Alert.alert('Error', 'Er is een fout opgetreden: ' + error.message);
+        }
       });
   };
 
-  // Functie om boekingen op te halen
   const fetchBookings = () => {
     const bookingsRef = ref(db, 'bookings');
     get(bookingsRef)
@@ -54,7 +91,6 @@ const BookingScreen = () => {
           const loadedBookings = Object.keys(data).map(key => ({ id: key, ...data[key] }));
           setBookings(loadedBookings);
         } else {
-          console.log("Geen boekingen gevonden");
           setBookings([]);
         }
       })
@@ -63,79 +99,82 @@ const BookingScreen = () => {
       });
   };
 
-  // Gebruik useEffect om boekingen op te halen wanneer de component geladen wordt
   useEffect(() => {
     fetchBookings();
   }, []);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Naam:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Uw naam"
-        value={name}
-        onChangeText={setName}
-      />
-
-      <Text style={styles.label}>E-mailadres:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Uw e-mailadres"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-      />
-
-      <Text style={styles.label}>Extra informatie:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Extra informatie (optioneel)"
-        value={info}
-        onChangeText={setInfo}
-      />
-
-      <Text style={styles.label}>Datum:</Text>
-      {Platform.OS === 'web' ? (
-        <DatePicker
-          selected={date}
-          onChange={(selectedDate) => setDate(selectedDate as Date)}
-          inline
+      <Header />
+      <View style={styles.content}>
+        <Text style={styles.label}>Naam:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Uw naam"
+          value={name}
+          onChangeText={setName}
         />
-      ) : (
-        <>
-          <Button title={date ? date.toDateString() : "Kies een datum"} onPress={() => setShowPicker(true)} />
-          {showPicker && (
-            <DateTimePicker
-              value={date || new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => {
-                setShowPicker(false);
-                if (selectedDate) {
-                  setDate(selectedDate);
-                }
-              }}
-            />
-          )}
-        </>
-      )}
 
-      <Button title="Boek Afspraak" onPress={handleBooking} />
+        <Text style={styles.label}>E-mailadres:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Uw e-mailadres"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+        />
 
-      <Text style={styles.bookingTitle}>Huidige Boekingen:</Text>
-      <FlatList
-        data={bookings}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.bookingItem}>
-            <Text style={styles.bookingText}>Naam: {item.name}</Text>
-            <Text style={styles.bookingText}>E-mail: {item.email}</Text>
-            <Text style={styles.bookingText}>Datum: {new Date(item.date).toLocaleDateString()}</Text>
-            <Text style={styles.bookingText}>Info: {item.info}</Text>
-          </View>
+        <Text style={styles.label}>Extra informatie:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Extra informatie (optioneel)"
+          value={info}
+          onChangeText={setInfo}
+        />
+
+        <Text style={styles.label}>Datum:</Text>
+        {Platform.OS === 'web' ? (
+          <DatePicker
+            selected={date}
+            onChange={(selectedDate) => setDate(selectedDate as Date)}
+            inline
+          />
+        ) : (
+          <>
+            <Button title={date ? date.toDateString() : "Kies een datum"} onPress={() => setShowPicker(true)} />
+            {showPicker && (
+              <DateTimePicker
+                value={date || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowPicker(false);
+                  if (selectedDate) {
+                    setDate(selectedDate);
+                  }
+                }}
+              />
+            )}
+          </>
         )}
-      />
+
+        <Button title="Boek Afspraak" onPress={handleBooking} />
+
+        <Text style={styles.bookingTitle}>Huidige Boekingen:</Text>
+        <FlatList
+          data={bookings}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.bookingItem}>
+              <Text style={styles.bookingText}>Naam: {item.name}</Text>
+              <Text style={styles.bookingText}>E-mail: {item.email}</Text>
+              <Text style={styles.bookingText}>Datum: {new Date(item.date).toLocaleDateString()}</Text>
+              <Text style={styles.bookingText}>Info: {item.info}</Text>
+            </View>
+          )}
+        />
+      </View>
+      <ToastContainer />
     </View>
   );
 };
@@ -143,8 +182,11 @@ const BookingScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
   },
   label: {
     fontSize: 16,
@@ -157,6 +199,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
     paddingHorizontal: 8,
+    borderRadius: 5,
   },
   bookingTitle: {
     fontSize: 18,
