@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, Alert, StyleSheet, Platform, FlatList } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import DatePicker from 'react-datepicker';
 import { ref, set, get } from "firebase/database";
 import { db } from '../../firebaseConfig';
 import Header from '../components/Header';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+
+// Import for the web DatePicker and toast notifications
+let DatePicker: any = null;
+import { ToastContainer as WebToastContainer } from 'react-toastify';
+
+// ...
+
+let ToastContainer: React.ElementType = WebToastContainer;
+let toast: any = null;
+
+if (Platform.OS === 'web') {
+  DatePicker = require('react-datepicker').default;
+  ToastContainer = require('react-toastify').ToastContainer;
+  toast = require('react-toastify').toast;
+  require('react-toastify/dist/ReactToastify.css');
+}
 
 const BookingScreen = () => {
   const [name, setName] = useState('');
@@ -136,7 +149,7 @@ const BookingScreen = () => {
         {Platform.OS === 'web' ? (
           <DatePicker
             selected={date}
-            onChange={(selectedDate) => setDate(selectedDate as Date)}
+            onChange={(selectedDate: Date) => setDate(selectedDate)}
             inline
           />
         ) : (
@@ -174,7 +187,7 @@ const BookingScreen = () => {
           )}
         />
       </View>
-      <ToastContainer />
+      {Platform.OS === 'web' && <ToastContainer />}
     </View>
   );
 };

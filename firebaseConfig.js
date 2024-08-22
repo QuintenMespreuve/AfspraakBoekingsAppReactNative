@@ -18,11 +18,19 @@ const firebaseConfig = {
   measurementId: "G-8MVPE7Z61P"
 };
 
-// Initialize Firebase
+// Firebase initialiseren
 const app = initializeApp(firebaseConfig);
-if (typeof window !== 'undefined') {
-  import("firebase/analytics").then(({ getAnalytics }) => {
-    getAnalytics(app);
+
+// Controleer of Analytics wordt ondersteund voordat het wordt geïmporteerd
+if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+  import("firebase/analytics").then(({ getAnalytics, isSupported }) => {
+    isSupported().then(supported => {
+      if (supported) {
+        getAnalytics(app);
+      } else {
+        console.log("Firebase Analytics wordt niet ondersteund in deze omgeving.");
+      }
+    });
   });
 }
 
